@@ -180,18 +180,18 @@ async function renderEval() {
   const draft = JSON.parse(localStorage.getItem(`draft_${state.user.id}_${state.targetId}`) || '{}')
   
   const items = [
-    { id: '1-1', cat: 1, title: '전사 전략과 직접적 연결' },
-    { id: '1-2', cat: 1, title: '선택과 집중' },
-    { id: '1-3', cat: 1, title: '리소스 할당의 명확성' },
-    { id: '2-1', cat: 2, title: '타겟과 대상의 명확성' },
-    { id: '2-2', cat: 2, title: '문제의 본질 파악' },
-    { id: '3-1', cat: 3, title: '정성적 아웃컴 정의' },
-    { id: '3-2', cat: 3, title: '성과 메커니즘 설명' },
-    { id: '3-3', cat: 3, title: '이해관계자 관점 포함' },
-    { id: '3-4', cat: 3, title: '시간대 설정의 현실성' },
-    { id: '4-1', cat: 4, title: '핵심 결과의 계량성' },
-    { id: '4-2', cat: 4, title: '진행 상황 모니터링' },
-    { id: '4-3', cat: 4, title: '달성 여부 판단 기준' }
+    { id: '1-1', cat: 1, title: '전사 전략과 직접적 연결', desc: '수립하려는 목표가 회사의 연간 전사 전략에 기여하는지 확인 | 왜 중요한가: 고립된 목표(Silo)는 배제되어야 하며, 상위 리더의 목표와 유기적으로 정렬되어야 함' },
+    { id: '1-2', cat: 1, title: '선택과 집중 원칙 준수', desc: '분기당 핵심 목표를 3~5개 이내로 압축 | 왜 중요한가: 한정된 자원을 가장 뾰족한 곳에 집중해야 효율성 극대화' },
+    { id: '1-3', cat: 1, title: '목적(Why)의 내재화', desc: '팀원 전원이 \'왜\'를 1분 내에 설명 가능한지 확인 | 왜 중요한가: 지시나 과업 이전에 목적에 대한 이해가 선행되어야 함' },
+    { id: '2-1', cat: 2, title: '명확한 이해관계자(주어) 설정', desc: '목표의 진정한 이해관계자/고객이 누구인지 정의 | 왜 중요한가: 업무에 영향을 받거나 혜택을 받는 대상을 명확히 해야 함' },
+    { id: '2-2', cat: 2, title: '근본적인 진짜 문제 파악', desc: '표면적 현상이 아닌 근본적 고통(Pain Point) 파악 | 왜 중요한가: 이해관계자가 반복적으로 겪는 가장 시급한 결핍을 정확히 파악해야 함' },
+    { id: '3-1', cat: 3, title: 'Output이 아닌 Outcome 지향', desc: '문제 해결 후의 긍정적 가치 창출 상태로 서술 | 왜 중요한가: 업무 리스트나 산출물 나열이 아닌 문제 해결 후 상태를 명시해야 함' },
+    { id: '3-2', cat: 3, title: '명확한 행동 언어 사용', desc: '\'주어+목적어+동사\'로 명료하게 기술 | 왜 중요한가: 모호한 표현을 배제하고 역동적인 행동 언어로 명료하게 기술해야 함' },
+    { id: '3-3', cat: 3, title: '기대 혜택의 구체화', desc: '성공 시 고객/이해관계자가 얻을 구체적 혜택 | 왜 중요한가: 1년 뒤의 모습을 생생하게 그려내어 동기부여해야 함' },
+    { id: '3-4', cat: 3, title: '치열한 토론을 통한 합의', desc: '위에서 아래로 일방적 하달이 아닌 합의 산물 | 왜 중요한가: 유관부서 및 팀원들과의 치열한 토론을 거쳐 도출되어야 함' },
+    { id: '4-1', cat: 4, title: '성공을 증명할 객관적 기준(KR)', desc: '구체적이고 측정 가능한 SMART 지표 설정 | 왜 중요한가: 진짜 문제를 해결하고 목표에 도달했음을 객관적으로 판단할 수 있어야 함' },
+    { id: '4-2', cat: 4, title: '명확한 기준선(Baseline)과 타겟', desc: '현재 수준 파악 및 구체적 타겟 수치 설정 | 왜 중요한가: 현재 수준이 어떠한지 정확히 파악하고 명확한 기한 내 달성 목표 설정' },
+    { id: '4-3', cat: 4, title: '주기적 추적(Tracking) 가능성', desc: '주간/월간 단위로 변화 흐름 추적 | 왜 중요한가: 연말 1회성 평가가 아닌 선제적 피드백 및 도움 요청이 가능해야 함' }
   ]
   
   app.innerHTML = `
@@ -205,6 +205,7 @@ async function renderEval() {
           <div class="item-row">
             <div class="item-num">질문 ${item.id}</div>
             <div class="item-title">${item.title}</div>
+            <div class="item-desc">${item.desc}</div>
             <div class="score-buttons">
               ${[1,2,3,4,5,6,7,8,9,10].map(s => `
                 <button onclick="setScore('${item.id}', ${s})" class="${draft[item.id] === s ? 'selected' : ''}">${s}</button>
