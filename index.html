@@ -198,6 +198,43 @@ async function renderReport() {
   
   const avgScore = (myEvals.reduce((sum, e) => sum + Object.values(e.scores).reduce((a, b) => a + Number(b), 0), 0) / (myEvals.length * 12)).toFixed(1)
   
+  // 최하위 영역 찾기
+  let lowestItem = null
+  let lowestScore = 11
+  
+  // 최상위 영역 찾기
+  let highestItem = null
+  let highestScore = 0
+  
+  items.forEach(item => {
+    const scores = myEvals.map(e => Number(e.scores[item.id])).filter(s => s)
+    const avg = scores.reduce((a, b) => a + b, 0) / scores.length
+    if (avg < lowestScore) {
+      lowestScore = avg
+      lowestItem = { ...item, score: avg.toFixed(1) }
+    }
+    if (avg > highestScore) {
+      highestScore = avg
+      highestItem = { ...item, score: avg.toFixed(1) }
+    }
+  })
+  
+  // 습관 제안
+  const habits = {
+    '1-1': '• 팀 목표를 명확히 정의하기\n• 주간 전략 검토 회의 개최\n• 상위 목표와의 연계성 문서화',
+    '1-2': '• 분기별 목표 3~5개로 제한\n• 우선순위 매트릭스 작성\n• 월 1회 목표 재검토',
+    '1-3': '• 팀 정기 회의에서 목표 공유\n• "왜"를 항상 먼저 설명하기\n• 목표 이해도 체크리스트 작성',
+    '2-1': '• 이해관계자 맵핑 작성\n• 정기적 스테이크홀더 미팅\n• 고객 피드백 수집 프로세스',
+    '2-2': '• 고객 인터뷰 2주마다\n• Pain Point 분석 워크샵\n• 문제 정의 템플릿 사용',
+    '3-1': '• 산출물이 아닌 가치에 집중\n• 영향도 측정 방식 정의\n• 분기별 성과 검토',
+    '3-2': '• 명확한 주어+동사+목적어 연습\n• 매주 목표 다시 쓰기\n• 모호한 표현 제거 체크리스트',
+    '3-3': '• 구체적 혜택 리스트 작성\n• 성공 사례 수집\n• 팀 공유 및 동기부여',
+    '3-4': '• 목표 설정 워크숍 개최\n• 전사 목표 연계 토론\n• 유관부서 의견 수렴',
+    '4-1': '• SMART 지표 체크리스트\n• 분기별 KR 설정 회의\n• 측정 방법 미리 정의',
+    '4-2': '• 현재 상태 정량화\n• 기준선(Baseline) 문서화\n• 명확한 타겟 수치 설정',
+    '4-3': '• 주간 진행 상황 점검\n• 월간 데이터 리뷰\n• 선제적 피드백 시스템'
+  }
+  
   app.innerHTML = `
     <h1>📊 나에 대한 평가 보고서</h1>
     <button class="btn btn-secondary" style="width: 150px;" onclick="state.page='menu'; render()">돌아가기</button>
@@ -218,6 +255,35 @@ async function renderReport() {
           `).join('')}
         </div>
       `).join('')}
+    </div>
+    
+    ${lowestItem ? `
+    <div class="card" style="background: #fffaf0; border-left: 4px solid #e53e3e;">
+      <h3 style="color: #e53e3e;">⚠️ 개선 필요 영역</h3>
+      <p style="margin: 10px 0;"><strong>${lowestItem.title}</strong> (평균: ${lowestItem.score}점)</p>
+      <p style="color: #718096; font-size: 13px; margin-bottom: 15px;">${lowestItem.desc}</p>
+      
+      <h4 style="color: #2d3748; margin: 15px 0 10px 0;">💡 추천 습관</h4>
+      <div style="white-space: pre-line; color: #2d3748; font-size: 13px; line-height: 1.8;">
+${habits[lowestItem.id] || '• 이 영역에 더 많은 집중과 노력을 기울여주세요.'}
+      </div>
+    </div>
+    ` : ''}
+    
+    ${highestItem ? `
+    <div class="card" style="background: #f0fdf4; border-left: 4px solid #48bb78;">
+      <h3 style="color: #48bb78;">⭐ 강점 영역</h3>
+      <p style="margin: 10px 0;"><strong>${highestItem.title}</strong> (평균: ${highestItem.score}점)</p>
+      <p style="color: #718096; font-size: 13px;">이 분야에서 탁월한 성과를 보이고 있습니다. 앞으로도 이 강점을 지속적으로 발전시켜주세요!</p>
+    </div>
+    ` : ''}
+    
+    <div class="card" style="background: #f0f9ff; border-top: 3px solid #4A90E2; text-align: center; margin-top: 30px;">
+      <p style="color: #2d3748; font-size: 13px; line-height: 1.8; white-space: pre-line;">
+그동안 혁신조직설계와 운영전략 수업을 들어주시어 감사했습니다.
+
+정태희 교수 드림
+      </p>
     </div>
   `
 }
