@@ -256,10 +256,46 @@ async function renderReport() {
     return
   }
   
+  const items = [
+    { id: '1-1', cat: 1, title: '전사 전략과 직접적 연결', desc: '수립하려는 목표가 회사의 연간 전사 전략에 기여하는지 확인 | 왜 중요한가: 고립된 목표(Silo)는 배제되어야 하며, 상위 리더의 목표와 유기적으로 정렬되어야 함' },
+    { id: '1-2', cat: 1, title: '선택과 집중 원칙 준수', desc: '분기당 핵심 목표를 3~5개 이내로 압축 | 왜 중요한가: 한정된 자원을 가장 뾰족한 곳에 집중해야 효율성 극대화' },
+    { id: '1-3', cat: 1, title: '목적(Why)의 내재화', desc: '팀원 전원이 \'왜\'를 1분 내에 설명 가능한지 확인 | 왜 중요한가: 지시나 과업 이전에 목적에 대한 이해가 선행되어야 함' },
+    { id: '2-1', cat: 2, title: '명확한 이해관계자(주어) 설정', desc: '목표의 진정한 이해관계자/고객이 누구인지 정의 | 왜 중요한가: 업무에 영향을 받거나 혜택을 받는 대상을 명확히 해야 함' },
+    { id: '2-2', cat: 2, title: '근본적인 진짜 문제 파악', desc: '표면적 현상이 아닌 근본적 고통(Pain Point) 파악 | 왜 중요한가: 이해관계자가 반복적으로 겪는 가장 시급한 결핍을 정확히 파악해야 함' },
+    { id: '3-1', cat: 3, title: 'Output이 아닌 Outcome 지향', desc: '문제 해결 후의 긍정적 가치 창출 상태로 서술 | 왜 중요한가: 업무 리스트나 산출물 나열이 아닌 문제 해결 후 상태를 명시해야 함' },
+    { id: '3-2', cat: 3, title: '명확한 행동 언어 사용', desc: '\'주어+목적어+동사\'로 명료하게 기술 | 왜 중요한가: 모호한 표현을 배제하고 역동적인 행동 언어로 명료하게 기술해야 함' },
+    { id: '3-3', cat: 3, title: '기대 혜택의 구체화', desc: '성공 시 고객/이해관계자가 얻을 구체적 혜택 | 왜 중요한가: 1년 뒤의 모습을 생생하게 그려내어 동기부여해야 함' },
+    { id: '3-4', cat: 3, title: '치열한 토론을 통한 합의', desc: '위에서 아래로 일방적 하달이 아닌 합의 산물 | 왜 중요한가: 유관부서 및 팀원들과의 치열한 토론을 거쳐 도출되어야 함' },
+    { id: '4-1', cat: 4, title: '성공을 증명할 객관적 기준(KR)', desc: '구체적이고 측정 가능한 SMART 지표 설정 | 왜 중요한가: 진짜 문제를 해결하고 목표에 도달했음을 객관적으로 판단할 수 있어야 함' },
+    { id: '4-2', cat: 4, title: '명확한 기준선(Baseline)과 타겟', desc: '현재 수준 파악 및 구체적 타겟 수치 설정 | 왜 중요한가: 현재 수준이 어떠한지 정확히 파악하고 명확한 기한 내 달성 목표 설정' },
+    { id: '4-3', cat: 4, title: '주기적 추적(Tracking) 가능성', desc: '주간/월간 단위로 변화 흐름 추적 | 왜 중요한가: 연말 1회성 평가가 아닌 선제적 피드백 및 도움 요청이 가능해야 함' }
+  ]
+  
+  // 질문별 점수 통계 계산
+  const scoreStats = {}
+  items.forEach(item => {
+    const scores = evaluations.map(e => Number(e.scores[item.id] || 0)).filter(s => s > 0)
+    if (scores.length > 0) {
+      scoreStats[item.id] = {
+        avg: (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1),
+        min: Math.min(...scores),
+        max: Math.max(...scores),
+        title: item.title,
+        desc: item.desc
+      }
+    }
+  })
+  
+  // 전체 평균
   const avgScore = (evaluations.reduce((sum, e) => {
     const scores = Object.values(e.scores || {}).map(Number)
     return sum + scores.reduce((a, b) => a + b, 0)
   }, 0) / evaluations.length).toFixed(1)
+  
+  // 가장 낮은 점수 질문 찾기
+  const lowestScore = Object.entries(scoreStats).reduce((lowest, [id, stat]) => {
+    return Number(stat.avg) < Number(lowest.avg) ? { id, ...stat } : lowest
+  }, { avg: 10 })
   
   app.innerHTML = `
     <div class="header">
@@ -268,11 +304,35 @@ async function renderReport() {
     </div>
     <div class="card">
       <div class="summary">
-        <h3>📈 요약</h3>
+        <h3>📈 전체 요약</h3>
         <p>전체 평균: <strong>${avgScore}점</strong> | 평가자: <strong>${evaluations.length}명</strong></p>
       </div>
       
-      <h3>📝 평가 내용</h3>
+      <h3>📋 질문별 점수 분석</h3>
+      ${items.map(item => {
+        const stat = scoreStats[item.id]
+        if (!stat) return ''
+        const avgNum = Number(stat.avg)
+        const color = avgNum >= 7 ? '#48bb78' : avgNum >= 5 ? '#f6ad55' : '#e53e3e'
+        return `
+          <div style="padding: 12px; border-left: 4px solid ${color}; background: #f7fafc; margin: 10px 0; border-radius: 4px;">
+            <div style="font-weight: 600; margin-bottom: 6px;">Q${item.id}. ${stat.title}</div>
+            <div style="font-size: 13px; color: #718096; margin-bottom: 8px;">평균: <strong style="color: ${color}; font-size: 15px;">${stat.avg}점</strong> | 범위: ${stat.min}~${stat.max}점</div>
+          </div>
+        `
+      }).join('')}
+      
+      <div style="margin-top: 20px; padding: 20px; background: #fff5f5; border-radius: 8px; border: 2px solid #e53e3e;">
+        <h3 style="color: #e53e3e;">⚠️ 개선 필요 영역</h3>
+        <p style="margin-bottom: 10px;"><strong>Q${lowestScore.id}. ${lowestScore.title}</strong></p>
+        <p style="font-size: 13px; color: #718096; margin-bottom: 10px; line-height: 1.6;">${lowestScore.desc}</p>
+        <p style="font-size: 12px; background: white; padding: 10px; border-radius: 4px; color: #2d3748;">
+          <strong>현재 평가 점수:</strong> ${lowestScore.avg}점 (${lowestScore.min}~${lowestScore.max}점)<br>
+          <strong>권고사항:</strong> 이 영역에 대한 집중 개선이 필요합니다.
+        </p>
+      </div>
+      
+      <h3 style="margin-top: 20px;">📝 평가자별 상세 내용</h3>
       ${evaluations.map((e, i) => `
         <div style="padding: 16px; background: #f7fafc; border-radius: 8px; margin: 10px 0;">
           <div style="font-weight: 600; margin-bottom: 10px;">평가 ${i + 1}</div>
