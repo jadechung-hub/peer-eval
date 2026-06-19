@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>다면평가 시스템</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Malgun Gothic', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+    .container { max-width: 1000px; margin: 0 auto; }
+    .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .header h1 { color: #2d3748; font-size: 24px; }
+    .btn { padding: 15px 20px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+    .btn-primary { background: #4A90E2; color: white; }
+    .btn-success { background: #48bb78; color: white; }
+    .btn-secondary { background: #718096; color: white; }
+    .btn-lg { width: 100%; padding: 20px; font-size: 16px; margin: 10px 0; }
+    .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
+    .target-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; margin-top: 20px; }
+    .target-item { padding: 20px; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; text-align: center; background: white; }
+    .target-item:hover { background: #f7fafc; border-color: #4A90E2; }
+    .target-item.evaluated { background: #f0fff4; border-color: #48bb78; }
+    .target-item .name { font-weight: 600; color: #2d3748; margin-bottom: 8px; }
+    .target-item .status { font-size: 12px; color: #718096; }
+    input { width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; }
+    .score-buttons { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin: 10px 0; }
+    .score-buttons button { padding: 8px; border: 2px solid #e2e8f0; background: white; border-radius: 6px; font-weight: 700; cursor: pointer; }
+    .score-buttons button.selected { background: #4A90E2; color: white; border-color: #4A90E2; }
+    .item-row { padding: 16px; border: 2px solid #edf2f7; border-radius: 8px; margin: 12px 0; }
+    .item-num { color: #4A90E2; font-weight: 700; margin-bottom: 8px; }
+    .item-title { font-weight: 600; color: #2d3748; margin-bottom: 4px; }
+    .item-desc { color: #718096; font-size: 13px; margin-bottom: 10px; line-height: 1.6; }
+    textarea { width: 100%; padding: 10px; border: 2px solid #e2e8f0; border-radius: 6px; font-family: inherit; min-height: 60px; margin: 8px 0; }
+    .empty { text-align: center; color: #718096; padding: 40px 20px; }
+    .summary { background: #ebf8ff; padding: 20px; border-radius: 8px; border-left: 4px solid #4A90E2; margin-bottom: 20px; }
+    h2 { color: #2d3748; margin: 20px 0; font-size: 20px; }
+    h3 { color: #2d3748; margin: 15px 0; font-size: 16px; }
+  </style>
+</head>
+<body>
+<div class="container" id="app"></div>
+
+<script>
+class DB {
+  constructor() {
+    this.baseURL = 'https://rxjdhgbczubyukyciahw.supabase.co'
+    this.apiKey = 'sb_publishable_7ehCkkr7aawuJSIOb_DGCA_hWsgLMGs'
+  }
+
+  async fetch(table, options = {}) {
+    let url = `${this.baseURL}/rest/v1/${table}`
+    const params = new URLSearchParams()
+    
+    Object.entries(options).forEach(([key, value]) => {
+      params.append(key, value)
+    })
+    
+    if (params.toString()) url += '?' + params.toString()
+    
+    const response = await fetch(url, {
+      headers: { 
+        'apikey': this.apiKey, 
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status}`)
+    }
+    
+    return response.json()
+  }
+
+  async insert(table, data) {
+    const response = await fetch(`${this.baseURL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: { 'apikey': this.apiKey, 'Authorization': `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    return response.json()
+  }
+}
+
+const db = new DB()
+
+let state = {
+  page: 'login',
+  user: null,
+  isAdmin: false,
+  targetId: null
+}
+
+async function render() {
+  const app = document.getElementById('app')
+  
+  if (state.page === 'login') {
+    app.innerHTML = `
+      <div class="card" style="max-width: 500px; margin: 100px auto;">
+        <h1 style="text-align: center; margin-bottom: 30px;">📋 다면평가 시스템</h1>
+        
+        <div style="margin-bottom: 20px;">
+          <h3>👥 참여자 로그인</h3>
+          <input type="text" id="name" placeholder="이름 입력">
+          <button class="btn btn-primary btn-lg" onclick="loginUser()">로그인</button>
+        </div>
+        
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 20px;">
+          <h3>⚙️ 관리자 로그인</h3>
+          <input type="password" id="pwd" placeholder="비밀번호">
+          <button class="btn btn-secondary btn-lg" onclick="loginAdmin()">관리자</button>
+          <p class="empty" style="font-size: 12px;">비밀번호: admin1234</p>
+        </div>
+      </div>
+    `
+  } else if (state.page === 'menu') {
+    await renderMenu()
+  } else if (state.page === 'eval') {
+    await renderEval()
+  } else if (state.page === 'report') {
+    await renderReport()
+  } else if (state.page === 'admin') {
+    await renderAdmin()
+  }
+}
+
+async function renderMenu() {
+  const app = document.getElementById('app')
+  const participants = await db.fetch('participants', { 'select': '*' })
+  const evaluations = await db.fetch('evaluations', { 'select': '*' })
+  
+  const others = participants.filter(p => p.id !== state.user.id)
+  
+  app.innerHTML = `
+    <div class="header">
+      <h1>👥 평가 시스템</h1>
+      <div>
+        <div style="color: #718096; margin-bottom: 10px;">${state.user.name}</div>
+        <button class="btn btn-secondary" onclick="logout()">로그아웃</button>
+      </div>
+    </div>
+    
+    <div class="card">
+      <div class="menu-grid">
+        <button class="btn btn-primary btn-lg" onclick="gotoEval()">📝 동료평가하기</button>
+        <button class="btn btn-success btn-lg" onclick="gotoReport()">📊 나에 대한 평가 보고서</button>
+      </div>
+    </div>
+    
+    <div class="card">
+      <h2>평가할 대상자</h2>
+      <p style="color: #718096; margin-bottom: 15px;">총 ${others.length}명 중 ${others.filter(p => !evaluations.find(e => e.evaluator_id === state.user.id && e.target_id === p.id)).length}명 대기</p>
+      <div class="target-list">
+        ${others.map(p => {
+          const isDone = evaluations.find(e => e.evaluator_id === state.user.id && e.target_id === p.id)
+          return `
+            <div class="target-item ${isDone ? 'evaluated' : ''}" onclick="selectTarget('${p.id}')">
+              <div class="name">${p.name}</div>
+              <div class="status">${isDone ? '✓ 완료' : '대기중'}</div>
+            </div>
+          `
+        }).join('')}
+      </div>
+    </div>
+  `
+}
+
+async function renderEval() {
+  const app = document.getElementById('app')
+  
+  if (!state.targetId) {
+    const participants = await db.fetch('participants', { 'select': '*' })
+    const others = participants.filter(p => p.id !== state.user.id)
+    
+    app.innerHTML = `
+      <div class="header">
+        <h1>📝 동료평가하기</h1>
+        <button class="btn btn-secondary" onclick="gotoMenu()">돌아가기</button>
+      </div>
+      <div class="card">
+        <div class="target-list">
+          ${others.map(p => `
+            <div class="target-item" onclick="selectTarget('${p.id}')">
+              <div class="name">${p.name}</div>
+              <div class="status">평가 시작</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `
+    return
+  }
+  
+  const participants = await db.fetch('participants', { 'select': '*' })
+  const target = participants.find(p => p.id === state.targetId)
+  const draft = JSON.parse(localStorage.getItem(`draft_${state.user.id}_${state.targetId}`) || '{}')
+  
+  const items = [
+    { id: '1-1', cat: 1, title: '전사 전략과 직접적 연결', desc: '수립하려는 목표가 회사의 연간 전사 전략에 기여하는지 확인 | 왜 중요한가: 고립된 목표(Silo)는 배제되어야 하며, 상위 리더의 목표와 유기적으로 정렬되어야 함' },
+    { id: '1-2', cat: 1, title: '선택과 집중 원칙 준수', desc: '분기당 핵심 목표를 3~5개 이내로 압축 | 왜 중요한가: 한정된 자원을 가장 뾰족한 곳에 집중해야 효율성 극대화' },
+    { id: '1-3', cat: 1, title: '목적(Why)의 내재화', desc: '팀원 전원이 \'왜\'를 1분 내에 설명 가능한지 확인 | 왜 중요한가: 지시나 과업 이전에 목적에 대한 이해가 선행되어야 함' },
+    { id: '2-1', cat: 2, title: '명확한 이해관계자(주어) 설정', desc: '목표의 진정한 이해관계자/고객이 누구인지 정의 | 왜 중요한가: 업무에 영향을 받거나 혜택을 받는 대상을 명확히 해야 함' },
+    { id: '2-2', cat: 2, title: '근본적인 진짜 문제 파악', desc: '표면적 현상이 아닌 근본적 고통(Pain Point) 파악 | 왜 중요한가: 이해관계자가 반복적으로 겪는 가장 시급한 결핍을 정확히 파악해야 함' },
+    { id: '3-1', cat: 3, title: 'Output이 아닌 Outcome 지향', desc: '문제 해결 후의 긍정적 가치 창출 상태로 서술 | 왜 중요한가: 업무 리스트나 산출물 나열이 아닌 문제 해결 후 상태를 명시해야 함' },
+    { id: '3-2', cat: 3, title: '명확한 행동 언어 사용', desc: '\'주어+목적어+동사\'로 명료하게 기술 | 왜 중요한가: 모호한 표현을 배제하고 역동적인 행동 언어로 명료하게 기술해야 함' },
+    { id: '3-3', cat: 3, title: '기대 혜택의 구체화', desc: '성공 시 고객/이해관계자가 얻을 구체적 혜택 | 왜 중요한가: 1년 뒤의 모습을 생생하게 그려내어 동기부여해야 함' },
+    { id: '3-4', cat: 3, title: '치열한 토론을 통한 합의', desc: '위에서 아래로 일방적 하달이 아닌 합의 산물 | 왜 중요한가: 유관부서 및 팀원들과의 치열한 토론을 거쳐 도출되어야 함' },
+    { id: '4-1', cat: 4, title: '성공을 증명할 객관적 기준(KR)', desc: '구체적이고 측정 가능한 SMART 지표 설정 | 왜 중요한가: 진짜 문제를 해결하고 목표에 도달했음을 객관적으로 판단할 수 있어야 함' },
+    { id: '4-2', cat: 4, title: '명확한 기준선(Baseline)과 타겟', desc: '현재 수준 파악 및 구체적 타겟 수치 설정 | 왜 중요한가: 현재 수준이 어떠한지 정확히 파악하고 명확한 기한 내 달성 목표 설정' },
+    { id: '4-3', cat: 4, title: '주기적 추적(Tracking) 가능성', desc: '주간/월간 단위로 변화 흐름 추적 | 왜 중요한가: 연말 1회성 평가가 아닌 선제적 피드백 및 도움 요청이 가능해야 함' }
+  ]
+  
+  app.innerHTML = `
+    <div class="header">
+      <h1>📋 ${target.name}님 평가</h1>
+      <button class="btn btn-secondary" onclick="gotoEval()">중단</button>
+    </div>
+    <div class="card">
+      <div style="max-height: 70vh; overflow-y: auto;">
+        ${items.map(item => `
+          <div class="item-row">
+            <div class="item-num">질문 ${item.id}</div>
+            <div class="item-title">${item.title}</div>
+            <div class="item-desc">${item.desc}</div>
+            <div class="score-buttons">
+              ${[1,2,3,4,5,6,7,8,9,10].map(s => `
+                <button onclick="setScore('${item.id}', ${s})" class="${draft[item.id] === s ? 'selected' : ''}">${s}</button>
+              `).join('')}
+            </div>
+            <textarea id="comment_${item.id}" placeholder="코멘트..." onchange="saveComment('${item.id}', this.value)">${draft[`comment_${item.id}`] || ''}</textarea>
+          </div>
+        `).join('')}
+      </div>
+      
+      <div style="margin-top: 20px; display: flex; gap: 10px;">
+        <button class="btn btn-secondary" style="flex: 1;" onclick="saveDraft()">💾 저장 & 나가기</button>
+        <button class="btn btn-success" style="flex: 1;" onclick="submitEval()">✓ 제출</button>
+      </div>
+    </div>
+  `
+}
+
+async function renderReport() {
+  const app = document.getElementById('app')
+  const evaluations = await db.fetch('evaluations', { 'select': '*', 'target_id': `eq.${state.user.id}` })
+  
+  if (evaluations.length === 0) {
+    app.innerHTML = `
+      <div class="header">
+        <h1>📊 나에 대한 평가 보고서</h1>
+        <button class="btn btn-secondary" onclick="gotoMenu()">돌아가기</button>
+      </div>
+      <div class="card"><div class="empty">아직 받은 평가가 없습니다.</div></div>
+    `
+    return
+  }
+  
+  const avgScore = (evaluations.reduce((sum, e) => {
+    const scores = Object.values(e.scores || {}).map(Number)
+    return sum + scores.reduce((a, b) => a + b, 0)
+  }, 0) / evaluations.length).toFixed(1)
+  
+  app.innerHTML = `
+    <div class="header">
+      <h1>📊 나에 대한 평가 보고서</h1>
+      <button class="btn btn-secondary" onclick="gotoMenu()">돌아가기</button>
+    </div>
+    <div class="card">
+      <div class="summary">
+        <h3>📈 요약</h3>
+        <p>전체 평균: <strong>${avgScore}점</strong> | 평가자: <strong>${evaluations.length}명</strong></p>
+      </div>
+      
+      <h3>📝 평가 내용</h3>
+      ${evaluations.map((e, i) => `
+        <div style="padding: 16px; background: #f7fafc; border-radius: 8px; margin: 10px 0;">
+          <div style="font-weight: 600; margin-bottom: 10px;">평가 ${i + 1}</div>
+          ${Object.entries(e.scores || {}).map(([id, score]) => `
+            <div style="font-size: 12px; color: #718096; margin: 5px 0;">• ${id}: ${score}점</div>
+          `).join('')}
+        </div>
+      `).join('')}
+    </div>
+  `
+}
+
+async function renderAdmin() {
+  const app = document.getElementById('app')
+  const participants = await db.fetch('participants', { 'select': '*' })
+  const evaluations = await db.fetch('evaluations', { 'select': '*' })
+  
+  app.innerHTML = `
+    <div class="header">
+      <h1>⚙️ 관리자 대시보드</h1>
+      <button class="btn btn-secondary" onclick="logout()">로그아웃</button>
+    </div>
+    <div class="card">
+      <h2>📊 평가 현황</h2>
+      <p style="margin: 20px 0;">총 참여자: ${participants.length}명 | 총 평가: ${evaluations.length}개</p>
+      
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr style="background: #f7fafc;">
+          <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e2e8f0;">이름</th>
+          <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e2e8f0;">받은 평가</th>
+          <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e2e8f0;">평가한 건수</th>
+        </tr>
+        ${participants.map(p => `
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${p.name}</td>
+            <td style="padding: 10px; text-align: center; border-bottom: 1px solid #e2e8f0;">${evaluations.filter(e => e.target_id === p.id).length}</td>
+            <td style="padding: 10px; text-align: center; border-bottom: 1px solid #e2e8f0;">${evaluations.filter(e => e.evaluator_id === p.id).length}</td>
+          </tr>
+        `).join('')}
+      </table>
+      
+      <button class="btn btn-danger btn-lg" style="margin-top: 20px; background: #e53e3e;" onclick="deleteAllData()">🗑️ 모든 데이터 삭제</button>
+    </div>
+  `
+}
+
+async function loginUser() {
+  const name = document.getElementById('name').value.trim()
+  if (!name) return alert('이름을 입력하세요')
+  
+  try {
+    let participants = await db.fetch('participants', { 'name': `eq.${name}` })
+    let id
+    
+    if (participants.length > 0) {
+      id = participants[0].id
+    } else {
+      id = Date.now().toString()
+      await db.insert('participants', { id, name })
+    }
+    
+    state.user = { id, name }
+    state.page = 'menu'
+    render()
+  } catch (e) {
+    alert('로그인 실패: ' + e.message)
+  }
+}
+
+function loginAdmin() {
+  const pwd = document.getElementById('pwd').value
+  if (pwd !== 'admin1234') return alert('비밀번호 틀림')
+  
+  state.isAdmin = true
+  state.page = 'admin'
+  render()
+}
+
+function gotoMenu() { state.page = 'menu'; state.targetId = null; render() }
+function gotoEval() { state.page = 'eval'; state.targetId = null; render() }
+function gotoReport() { state.page = 'report'; render() }
+function logout() { state.user = null; state.isAdmin = false; state.page = 'login'; render() }
+
+function selectTarget(id) { state.targetId = id; state.page = 'eval'; render() }
+
+function setScore(id, score) {
+  const draft = JSON.parse(localStorage.getItem(`draft_${state.user.id}_${state.targetId}`) || '{}')
+  draft[id] = score
+  localStorage.setItem(`draft_${state.user.id}_${state.targetId}`, JSON.stringify(draft))
+  
+  document.querySelectorAll(`button`).forEach(btn => {
+    if(btn.textContent == score && btn.onclick.toString().includes(id)) {
+      btn.classList.add('selected')
+    } else if(btn.onclick.toString().includes(id)) {
+      btn.classList.remove('selected')
+    }
+  })
+}
+
+function saveComment(id, value) {
+  const draft = JSON.parse(localStorage.getItem(`draft_${state.user.id}_${state.targetId}`) || '{}')
+  draft[`comment_${id}`] = value
+  localStorage.setItem(`draft_${state.user.id}_${state.targetId}`, JSON.stringify(draft))
+}
+
+function saveDraft() {
+  alert('저장되었습니다!')
+  gotoMenu()
+}
+
+async function submitEval() {
+  const draft = JSON.parse(localStorage.getItem(`draft_${state.user.id}_${state.targetId}`) || '{}')
+  const scores = {}
+  const comments = {}
+  
+  Object.entries(draft).forEach(([key, value]) => {
+    if (!key.startsWith('comment_')) scores[key] = value
+    else comments[key.replace('comment_', '')] = value
+  })
+  
+  if (Object.keys(scores).length < 12) return alert('모든 항목을 입력하세요')
+  
+  try {
+    await db.insert('evaluations', {
+      evaluator_id: state.user.id,
+      evaluator_name: state.user.name,
+      target_id: state.targetId,
+      scores,
+      comments
+    })
+    localStorage.removeItem(`draft_${state.user.id}_${state.targetId}`)
+    alert('제출되었습니다!')
+    gotoMenu()
+  } catch (e) {
+    alert('제출 실패: ' + e.message)
+  }
+}
+
+async function deleteAllData() {
+  if (!confirm('모든 데이터를 삭제하시겠습니까?')) return
+  const pwd = prompt('비밀번호:')
+  if (pwd !== 'admin1234') return alert('비밀번호 틀림')
+  
+  try {
+    await fetch('https://rxjdhgbczubyukyciahw.supabase.co/rest/v1/evaluations?id=neq.0', {
+      method: 'DELETE',
+      headers: { 'apikey': 'sb_publishable_7ehCkkr7aawuJSIOb_DGCA_hWsgLMGs', 'Authorization': 'Bearer sb_publishable_7ehCkkr7aawuJSIOb_DGCA_hWsgLMGs' }
+    })
+    await fetch('https://rxjdhgbczubyukyciahw.supabase.co/rest/v1/participants?id=neq.0', {
+      method: 'DELETE',
+      headers: { 'apikey': 'sb_publishable_7ehCkkr7aawuJSIOb_DGCA_hWsgLMGs', 'Authorization': 'Bearer sb_publishable_7ehCkkr7aawuJSIOb_DGCA_hWsgLMGs' }
+    })
+    alert('삭제되었습니다!')
+    render()
+  } catch (e) {
+    alert('삭제 실패: ' + e.message)
+  }
+}
+
+render()
+</script>
+</body>
+</html>
