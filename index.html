@@ -50,27 +50,38 @@ class DB {
 
   async fetch(table, options = {}) {
     let url = `${this.baseURL}/rest/v1/${table}`
-    const params = new URLSearchParams()
     
+    const params = new URLSearchParams()
     Object.entries(options).forEach(([key, value]) => {
       params.append(key, value)
     })
     
-    if (params.toString()) url += '?' + params.toString()
-    
-    const response = await fetch(url, {
-      headers: { 
-        'apikey': this.apiKey, 
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json'
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`)
+    if (params.toString()) {
+      url += '?' + params.toString()
     }
     
-    return response.json()
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 
+          'apikey': this.apiKey,
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      
+      const text = await response.text()
+      if (!text) return []
+      
+      return JSON.parse(text)
+    } catch (error) {
+      console.error('Fetch error:', error)
+      return []
+    }
   }
 
   async insert(table, data) {
