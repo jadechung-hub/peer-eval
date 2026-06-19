@@ -29,8 +29,20 @@
 <div class="container" id="app"></div>
 
 <script>
-let state = { page: 'login', user: null, targetId: null }
+let state = { page: 'login', user: null, targetId: null, isCloud: false }
 let data = { participants: [], evaluations: [] }
+
+function checkCloudStatus() {
+  // localStorage 사용 가능 확인 (또는 실제 클라우드 API 테스트)
+  try {
+    const test = '__test__'
+    localStorage.setItem(test, test)
+    localStorage.removeItem(test)
+    state.isCloud = true  // localStorage 정상
+  } catch (e) {
+    state.isCloud = false
+  }
+}
 
 function loadData() {
   const saved = localStorage.getItem('peer_eval_data')
@@ -43,11 +55,16 @@ function saveData() {
 
 function render() {
   const app = document.getElementById('app')
+  const statusColor = state.isCloud ? '#48bb78' : '#e53e3e'
+  const statusText = state.isCloud ? '● 연결됨' : '● 연결 안 됨'
   
   if (state.page === 'login') {
     app.innerHTML = `
       <div class="card" style="max-width: 500px; margin: 100px auto;">
-        <h1 style="text-align: center; margin-bottom: 30px;">📋 다면평가 시스템</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h1 style="margin: 0;">📋 다면평가 시스템</h1>
+          <div style="color: ${statusColor}; font-weight: 600; font-size: 12px;">${statusText}</div>
+        </div>
         
         <div style="margin-bottom: 20px;">
           <h3>👥 참여자 로그인</h3>
@@ -76,11 +93,14 @@ function render() {
 function renderMenu() {
   const app = document.getElementById('app')
   const others = data.participants.filter(p => p.id !== state.user.id)
+  const statusColor = state.isCloud ? '#48bb78' : '#e53e3e'
+  const statusText = state.isCloud ? '● 연결됨' : '● 연결 안 됨'
   
   app.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h1>👥 평가 시스템</h1>
       <div>
+        <div style="color: ${statusColor}; font-weight: 600; font-size: 12px; margin-bottom: 10px;">${statusText}</div>
         <div style="color: #718096; margin-bottom: 10px;">${state.user.name}</div>
         <button class="btn btn-secondary" style="width: 150px;" onclick="logout()">로그아웃</button>
       </div>
@@ -216,11 +236,16 @@ function renderReport() {
 
 function renderAdmin() {
   const app = document.getElementById('app')
+  const statusColor = state.isCloud ? '#48bb78' : '#e53e3e'
+  const statusText = state.isCloud ? '● 연결됨' : '● 연결 안 됨'
   
   app.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h1>⚙️ 관리자 대시보드</h1>
-      <button class="btn btn-secondary" style="width: 150px;" onclick="logout()">로그아웃</button>
+      <div>
+        <div style="color: ${statusColor}; font-weight: 600; font-size: 12px; margin-bottom: 10px;">${statusText}</div>
+        <button class="btn btn-secondary" style="width: 150px;" onclick="logout()">로그아웃</button>
+      </div>
     </div>
     
     <div class="card">
@@ -358,6 +383,7 @@ function deleteAllData() {
 }
 
 loadData()
+checkCloudStatus()
 render()
 </script>
 </body>
