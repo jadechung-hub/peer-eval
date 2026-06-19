@@ -28,12 +28,12 @@
     .score-buttons button { padding: 8px; border: 2px solid #e2e8f0; background: white; border-radius: 6px; font-weight: 700; cursor: pointer; }
     .score-buttons button.selected { background: #4A90E2; color: white; border-color: #4A90E2; }
     .item-row { padding: 16px; border: 2px solid #edf2f7; border-radius: 8px; margin: 12px 0; }
+    .item-num { color: #4A90E2; font-weight: 700; margin-bottom: 8px; }
     .item-title { font-weight: 600; color: #2d3748; margin-bottom: 4px; }
     .item-desc { color: #718096; font-size: 13px; margin-bottom: 10px; }
     textarea { width: 100%; padding: 10px; border: 2px solid #e2e8f0; border-radius: 6px; font-family: inherit; min-height: 60px; margin: 8px 0; }
     .empty { text-align: center; color: #718096; padding: 40px 20px; }
     .summary { background: #ebf8ff; padding: 20px; border-radius: 8px; border-left: 4px solid #4A90E2; margin-bottom: 20px; }
-    .category-score { padding: 16px; background: #f7fafc; border-radius: 8px; border-left: 4px solid #4A90E2; margin: 10px 0; }
     h2 { color: #2d3748; margin: 20px 0; font-size: 20px; }
     h3 { color: #2d3748; margin: 15px 0; font-size: 16px; }
   </style>
@@ -42,7 +42,6 @@
 <div class="container" id="app"></div>
 
 <script>
-// ===== SUPABASE =====
 class DB {
   constructor() {
     this.baseURL = 'https://rxjdhgbczubyukyciahw.supabase.co'
@@ -65,19 +64,10 @@ class DB {
     })
     return response.json()
   }
-
-  async delete(table, column, value) {
-    const response = await fetch(`${this.baseURL}/rest/v1/${table}?${column}=eq.${value}`, {
-      method: 'DELETE',
-      headers: { 'apikey': this.apiKey, 'Authorization': `Bearer ${this.apiKey}` }
-    })
-    return response.json()
-  }
 }
 
 const db = new DB()
 
-// ===== STATE =====
 let state = {
   page: 'login',
   user: null,
@@ -85,7 +75,6 @@ let state = {
   targetId: null
 }
 
-// ===== RENDER =====
 async function render() {
   const app = document.getElementById('app')
   
@@ -211,9 +200,10 @@ async function renderEval() {
       <button class="btn btn-secondary" onclick="gotoEval()">중단</button>
     </div>
     <div class="card">
-      <div style="max-height: 70vh; overflow-y: auto;">
+      <div style="max-height: 70vh; overflow-y: auto;" id="evalForm">
         ${items.map(item => `
           <div class="item-row">
+            <div class="item-num">질문 ${item.id}</div>
             <div class="item-title">${item.title}</div>
             <div class="score-buttons">
               ${[1,2,3,4,5,6,7,8,9,10].map(s => `
@@ -311,7 +301,6 @@ async function renderAdmin() {
   `
 }
 
-// ===== FUNCTIONS =====
 async function loginUser() {
   const name = document.getElementById('name').value.trim()
   if (!name) return alert('이름을 입력하세요')
@@ -355,7 +344,10 @@ function setScore(id, score) {
   const draft = JSON.parse(localStorage.getItem(`draft_${state.user.id}_${state.targetId}`) || '{}')
   draft[id] = score
   localStorage.setItem(`draft_${state.user.id}_${state.targetId}`, JSON.stringify(draft))
-  render()
+  
+  // 버튼만 업데이트 (페이지 새로고침 안 함)
+  document.querySelectorAll(`[data-item="${id}"]`).forEach(btn => btn.classList.remove('selected'))
+  event.target.classList.add('selected')
 }
 
 function saveComment(id, value) {
