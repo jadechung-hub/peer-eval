@@ -37,16 +37,7 @@ const SUPABASE_KEY = 'sb_publishable_7ehCkkr7aawuJSIOb_DGCA_hWsgLMGs'
 const { createClient } = supabase
 const client = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-let state = { page: 'login', user: null, isAdmin: false, targetId: null, isConnected: false }
-
-async function checkConnection() {
-  try {
-    const { data, error } = await client.from('participants').select('count()').limit(1)
-    state.isConnected = !error
-  } catch (e) {
-    state.isConnected = false
-  }
-}
+let state = { page: 'login', user: null, isAdmin: false, targetId: null }
 
 const items = [
   { id: '1-1', title: '전사 전략과 직접적 연결', desc: '수립하려는 목표가 회사의 연간 전사 전략에 기여하는지 확인' },
@@ -65,15 +56,11 @@ const items = [
 
 async function render() {
   const app = document.getElementById('app')
-  const statusText = state.isConnected ? '🟢 연결됨' : '🔴 연결 안 됨'
   
   if (state.page === 'login') {
     app.innerHTML = `
       <div class="card" style="max-width: 500px; margin: 100px auto;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-          <h1 style="margin: 0;">📋 다면평가</h1>
-          <div class="status ${state.isConnected ? 'status-ok' : 'status-fail'}">${statusText}</div>
-        </div>
+        <h1 style="text-align: center; margin-bottom: 30px;">📋 다면평가 시스템</h1>
         
         <div style="margin-bottom: 20px;">
           <h3>👥 참여자 로그인</h3>
@@ -104,13 +91,11 @@ async function renderMenu() {
   const { data: participants } = await client.from('participants').select('*')
   const { data: evaluations } = await client.from('evaluations').select('*')
   const others = participants.filter(p => p.id !== state.user.id)
-  const statusText = state.isConnected ? '🟢 연결됨' : '🔴 연결 안 됨'
   
   app.innerHTML = `
     <div class="header">
       <h1>👥 평가 시스템</h1>
       <div>
-        <div style="color: #718096; margin-bottom: 10px; font-size: 12px; font-weight: 600;">${statusText}</div>
         <div style="color: #718096; margin-bottom: 10px;">${state.user.name}</div>
         <button class="btn btn-secondary" style="width: 150px;" onclick="logout()">로그아웃</button>
       </div>
@@ -241,13 +226,11 @@ async function renderAdmin() {
   const app = document.getElementById('app')
   const { data: participants } = await client.from('participants').select('*')
   const { data: evaluations } = await client.from('evaluations').select('*')
-  const statusText = state.isConnected ? '🟢 연결됨' : '🔴 연결 안 됨'
   
   app.innerHTML = `
     <div class="header">
       <h1>⚙️ 관리자 대시보드</h1>
       <div>
-        <div style="color: #718096; margin-bottom: 10px; font-size: 12px; font-weight: 600;">${statusText}</div>
         <button class="btn btn-secondary" style="width: 150px;" onclick="logout()">로그아웃</button>
       </div>
     </div>
@@ -270,6 +253,8 @@ async function renderAdmin() {
           </tr>
         `).join('')}
       </table>
+      
+      <button class="btn" style="background: #e53e3e; color: white; margin-top: 20px;" onclick="deleteAllData()">🗑️ 모든 데이터 삭제</button>
     </div>
   `
 }
@@ -382,7 +367,22 @@ function logout() {
   render()
 }
 
-checkConnection()
+async function deleteAllData() {
+  if (!confirm('모든 데이터를 삭제하시겠습니까?')) return
+  const pwd = prompt('비밀번호:')
+  if (pwd !== 'admin1234') return alert('비밀번호 틀림')
+  if (!confirm('정말로 삭제하시겠습니까? (되돌릴 수 없습니다)')) return
+  
+  try {
+    await client.from('evaluations').delete().neq('id', '')
+    await client.from('participants').delete().neq('id', '')
+    alert('모든 데이터가 삭제되었습니다!')
+    render()
+  } catch (e) {
+    alert('삭제 실패: ' + e.message)
+  }
+}
+
 render()
 </script>
 </body>
