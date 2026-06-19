@@ -337,7 +337,10 @@ async function renderReport() {
         <div style="padding: 16px; background: #f7fafc; border-radius: 8px; margin: 10px 0;">
           <div style="font-weight: 600; margin-bottom: 10px;">평가 ${i + 1}</div>
           ${Object.entries(e.scores || {}).map(([id, score]) => `
-            <div style="font-size: 12px; color: #718096; margin: 5px 0;">• ${id}: ${score}점</div>
+            <div style="margin-bottom: 12px; padding: 10px; background: white; border-radius: 4px;">
+              <div style="font-weight: 600; font-size: 12px; color: #2d3748; margin-bottom: 4px;">Q${id}: ${score}점</div>
+              ${e.comments && e.comments[id] ? `<div style="font-size: 12px; color: #718096; border-left: 3px solid #4A90E2; padding-left: 8px;">💬 ${e.comments[id]}</div>` : ''}
+            </div>
           `).join('')}
         </div>
       `).join('')}
