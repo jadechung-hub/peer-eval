@@ -9,6 +9,8 @@
     body { font-family: 'Malgun Gothic', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
     .container { max-width: 1000px; margin: 0 auto; }
     .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .header h1 { color: #2d3748; font-size: 24px; }
     .btn { padding: 15px 20px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; width: 100%; margin: 10px 0; }
     .btn-primary { background: #4A90E2; color: white; }
     .btn-success { background: #48bb78; color: white; }
@@ -23,47 +25,100 @@
     .item-desc { color: #718096; font-size: 13px; margin-bottom: 10px; line-height: 1.6; }
     h1 { color: #2d3748; margin-bottom: 20px; }
     h3 { color: #2d3748; margin: 15px 0; }
+    .status { font-weight: 600; font-size: 12px; padding: 4px 8px; border-radius: 4px; display: inline-block; }
+    .status-ok { background: #c6f6d5; color: #22543d; }
+    .status-fail { background: #fed7d7; color: #742a2a; }
   </style>
 </head>
 <body>
 <div class="container" id="app"></div>
 
 <script>
-let state = { page: 'login', user: null, targetId: null, isCloud: false }
-let data = { participants: [], evaluations: [] }
+const SUPABASE_URL = 'https://rxjdhgbczubyukyciahw.supabase.co'
+const SUPABASE_KEY = 'sb_publishable_7ehCkkr7aawuJSIOb_DGCA_hWsgLMGs'
 
-function checkCloudStatus() {
-  // localStorage 사용 가능 확인 (또는 실제 클라우드 API 테스트)
+let state = { page: 'login', user: null, isAdmin: false, targetId: null, isConnected: false }
+
+async function checkConnection() {
   try {
-    const test = '__test__'
-    localStorage.setItem(test, test)
-    localStorage.removeItem(test)
-    state.isCloud = true  // localStorage 정상
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/participants?select=count()&limit=1`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    })
+    state.isConnected = response.ok
   } catch (e) {
-    state.isCloud = false
+    state.isConnected = false
   }
 }
 
-function loadData() {
-  const saved = localStorage.getItem('peer_eval_data')
-  if (saved) data = JSON.parse(saved)
+async function dbFetch(table, filters = {}) {
+  try {
+    let url = `${SUPABASE_URL}/rest/v1/${table}?select=*`
+    
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value.includes('eq.')) {
+        const val = value.split('eq.')[1]
+        url += `&${key}=eq.${encodeURIComponent(val)}`
+      }
+    })
+    
+    const response = await fetch(url, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    })
+    
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    return await response.json()
+  } catch (e) {
+    console.error('DB Error:', e)
+    return []
+  }
 }
 
-function saveData() {
-  localStorage.setItem('peer_eval_data', JSON.stringify(data))
+async function dbInsert(table, data) {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: { 
+        'apikey': SUPABASE_KEY, 
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    })
+    
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    return await response.json()
+  } catch (e) {
+    console.error('Insert Error:', e)
+    return null
+  }
 }
 
-function render() {
+const items = [
+  { id: '1-1', title: '전사 전략과 직접적 연결', desc: '수립하려는 목표가 회사의 연간 전사 전략에 기여하는지 확인' },
+  { id: '1-2', title: '선택과 집중 원칙 준수', desc: '분기당 핵심 목표를 3~5개 이내로 압축' },
+  { id: '1-3', title: '목적(Why)의 내재화', desc: '팀원 전원이 \'왜\'를 1분 내에 설명 가능한지 확인' },
+  { id: '2-1', title: '명확한 이해관계자(주어) 설정', desc: '목표의 진정한 이해관계자/고객이 누구인지 정의' },
+  { id: '2-2', title: '근본적인 진짜 문제 파악', desc: '표면적 현상이 아닌 근본적 고통(Pain Point) 파악' },
+  { id: '3-1', title: 'Output이 아닌 Outcome 지향', desc: '문제 해결 후의 긍정적 가치 창출 상태로 서술' },
+  { id: '3-2', title: '명확한 행동 언어 사용', desc: '\'주어+목적어+동사\'로 명료하게 기술' },
+  { id: '3-3', title: '기대 혜택의 구체화', desc: '성공 시 고객/이해관계자가 얻을 구체적 혜택' },
+  { id: '3-4', title: '치열한 토론을 통한 합의', desc: '위에서 아래로 일방적 하달이 아닌 합의 산물' },
+  { id: '4-1', title: '성공을 증명할 객관적 기준(KR)', desc: '구체적이고 측정 가능한 SMART 지표 설정' },
+  { id: '4-2', title: '명확한 기준선(Baseline)과 타겟', desc: '현재 수준 파악 및 구체적 타겟 수치 설정' },
+  { id: '4-3', title: '주기적 추적(Tracking) 가능성', desc: '주간/월간 단위로 변화 흐름 추적' }
+]
+
+async function render() {
   const app = document.getElementById('app')
-  const statusColor = state.isCloud ? '#48bb78' : '#e53e3e'
-  const statusText = state.isCloud ? '● 연결됨' : '● 연결 안 됨'
+  const statusColor = state.isConnected ? '#48bb78' : '#e53e3e'
+  const statusText = state.isConnected ? '🟢 연결됨' : '🔴 연결 안 됨'
   
   if (state.page === 'login') {
     app.innerHTML = `
       <div class="card" style="max-width: 500px; margin: 100px auto;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-          <h1 style="margin: 0;">📋 다면평가 시스템</h1>
-          <div style="color: ${statusColor}; font-weight: 600; font-size: 12px;">${statusText}</div>
+          <h1 style="margin: 0;">📋 다면평가</h1>
+          <div class="status" style="background: ${state.isConnected ? '#c6f6d5' : '#fed7d7'}; color: ${state.isConnected ? '#22543d' : '#742a2a'};">${statusText}</div>
         </div>
         
         <div style="margin-bottom: 20px;">
@@ -90,18 +145,19 @@ function render() {
   }
 }
 
-function renderMenu() {
+async function renderMenu() {
   const app = document.getElementById('app')
-  const others = data.participants.filter(p => p.id !== state.user.id)
-  const statusColor = state.isCloud ? '#48bb78' : '#e53e3e'
-  const statusText = state.isCloud ? '● 연결됨' : '● 연결 안 됨'
+  const participants = await dbFetch('participants')
+  const evaluations = await dbFetch('evaluations')
+  const others = participants.filter(p => p.id !== state.user.id)
+  const statusText = state.isConnected ? '🟢 연결됨' : '🔴 연결 안 됨'
   
   app.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div class="header">
       <h1>👥 평가 시스템</h1>
       <div>
-        <div style="color: ${statusColor}; font-weight: 600; font-size: 12px; margin-bottom: 10px;">${statusText}</div>
         <div style="color: #718096; margin-bottom: 10px;">${state.user.name}</div>
+        <div style="color: #718096; margin-bottom: 10px; font-size: 12px; font-weight: 600;">${statusText}</div>
         <button class="btn btn-secondary" style="width: 150px;" onclick="logout()">로그아웃</button>
       </div>
     </div>
@@ -114,24 +170,30 @@ function renderMenu() {
     <div class="card">
       <h3>평가할 대상자</h3>
       <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; margin-top: 20px;">
-        ${others.map(p => `
-          <div style="padding: 20px; border: 2px solid #e2e8f0; border-radius: 8px; text-align: center; cursor: pointer;" onclick="state.targetId='${p.id}'; state.page='eval'; render()">
-            <div style="font-weight: 600; color: #2d3748;">${p.name}</div>
-          </div>
-        `).join('')}
+        ${others.map(p => {
+          const isDone = evaluations.find(e => e.evaluator_id === state.user.id && e.target_id === p.id)
+          return `
+            <div style="padding: 20px; border: 2px solid ${isDone ? '#48bb78' : '#e2e8f0'}; border-radius: 8px; text-align: center; cursor: pointer; background: ${isDone ? '#f0fff4' : 'white'};" onclick="state.targetId='${p.id}'; state.page='eval'; render()">
+              <div style="font-weight: 600; color: #2d3748;">${p.name}</div>
+              <div style="font-size: 12px; color: #718096;">${isDone ? '✓ 완료' : '대기중'}</div>
+            </div>
+          `
+        }).join('')}
       </div>
     </div>
   `
 }
 
-function renderEval() {
+async function renderEval() {
   const app = document.getElementById('app')
   
   if (!state.targetId) {
-    const others = data.participants.filter(p => p.id !== state.user.id)
+    const participants = await dbFetch('participants')
+    const others = participants.filter(p => p.id !== state.user.id)
+    
     app.innerHTML = `
       <h1>📝 동료평가하기</h1>
-      <button class="btn btn-secondary" onclick="state.page='menu'; render()">돌아가기</button>
+      <button class="btn btn-secondary" style="width: 150px;" onclick="state.page='menu'; render()">돌아가기</button>
       <div class="card">
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px;">
           ${others.map(p => `
@@ -145,24 +207,10 @@ function renderEval() {
     return
   }
   
-  const target = data.participants.find(p => p.id === state.targetId)
+  const participants = await dbFetch('participants')
+  const target = participants.find(p => p.id === state.targetId)
   const draftKey = `draft_${state.user.id}_${state.targetId}`
   const draft = JSON.parse(localStorage.getItem(draftKey) || '{}')
-  
-  const items = [
-    { id: '1-1', title: '전사 전략과 직접적 연결', desc: '수립하려는 목표가 회사의 연간 전사 전략에 기여하는지 확인' },
-    { id: '1-2', title: '선택과 집중 원칙 준수', desc: '분기당 핵심 목표를 3~5개 이내로 압축' },
-    { id: '1-3', title: '목적(Why)의 내재화', desc: '팀원 전원이 \'왜\'를 1분 내에 설명 가능한지 확인' },
-    { id: '2-1', title: '명확한 이해관계자(주어) 설정', desc: '목표의 진정한 이해관계자/고객이 누구인지 정의' },
-    { id: '2-2', title: '근본적인 진짜 문제 파악', desc: '표면적 현상이 아닌 근본적 고통(Pain Point) 파악' },
-    { id: '3-1', title: 'Output이 아닌 Outcome 지향', desc: '문제 해결 후의 긍정적 가치 창출 상태로 서술' },
-    { id: '3-2', title: '명확한 행동 언어 사용', desc: '\'주어+목적어+동사\'로 명료하게 기술' },
-    { id: '3-3', title: '기대 혜택의 구체화', desc: '성공 시 고객/이해관계자가 얻을 구체적 혜택' },
-    { id: '3-4', title: '치열한 토론을 통한 합의', desc: '위에서 아래로 일방적 하달이 아닌 합의 산물' },
-    { id: '4-1', title: '성공을 증명할 객관적 기준(KR)', desc: '구체적이고 측정 가능한 SMART 지표 설정' },
-    { id: '4-2', title: '명확한 기준선(Baseline)과 타겟', desc: '현재 수준 파악 및 구체적 타겟 수치 설정' },
-    { id: '4-3', title: '주기적 추적(Tracking) 가능성', desc: '주간/월간 단위로 변화 흐름 추적' }
-  ]
   
   app.innerHTML = `
     <div style="margin-bottom: 20px;">
@@ -195,11 +243,11 @@ function renderEval() {
   `
 }
 
-function renderReport() {
+async function renderReport() {
   const app = document.getElementById('app')
-  const myEvals = data.evaluations.filter(e => e.target_id === state.user.id)
+  const evaluations = await dbFetch('evaluations', { 'target_id': `eq.${state.user.id}` })
   
-  if (myEvals.length === 0) {
+  if (evaluations.length === 0) {
     app.innerHTML = `
       <h1>📊 나에 대한 평가 보고서</h1>
       <button class="btn btn-secondary" style="width: 150px;" onclick="state.page='menu'; render()">돌아가기</button>
@@ -208,7 +256,7 @@ function renderReport() {
     return
   }
   
-  const avgScore = (myEvals.reduce((sum, e) => sum + Object.values(e.scores).reduce((a, b) => a + Number(b), 0), 0) / (myEvals.length * 12)).toFixed(1)
+  const avgScore = (evaluations.reduce((sum, e) => sum + Object.values(e.scores).reduce((a, b) => a + Number(b), 0), 0) / (evaluations.length * 12)).toFixed(1)
   
   app.innerHTML = `
     <h1>📊 나에 대한 평가 보고서</h1>
@@ -216,10 +264,10 @@ function renderReport() {
     
     <div class="card">
       <h3>📈 요약</h3>
-      <p>전체 평균: <strong>${avgScore}점</strong> | 평가자: <strong>${myEvals.length}명</strong></p>
+      <p>전체 평균: <strong>${avgScore}점</strong> | 평가자: <strong>${evaluations.length}명</strong></p>
       
       <h3 style="margin-top: 20px;">📝 평가 내용</h3>
-      ${myEvals.map((e, i) => `
+      ${evaluations.map((e, i) => `
         <div style="padding: 16px; background: #f7fafc; border-radius: 8px; margin: 10px 0;">
           <div style="font-weight: 600; margin-bottom: 10px;">평가 ${i + 1}</div>
           ${Object.entries(e.scores).map(([id, score]) => `
@@ -234,23 +282,24 @@ function renderReport() {
   `
 }
 
-function renderAdmin() {
+async function renderAdmin() {
   const app = document.getElementById('app')
-  const statusColor = state.isCloud ? '#48bb78' : '#e53e3e'
-  const statusText = state.isCloud ? '● 연결됨' : '● 연결 안 됨'
+  const participants = await dbFetch('participants')
+  const evaluations = await dbFetch('evaluations')
+  const statusText = state.isConnected ? '🟢 연결됨' : '🔴 연결 안 됨'
   
   app.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div class="header">
       <h1>⚙️ 관리자 대시보드</h1>
       <div>
-        <div style="color: ${statusColor}; font-weight: 600; font-size: 12px; margin-bottom: 10px;">${statusText}</div>
+        <div style="color: #718096; margin-bottom: 10px; font-size: 12px; font-weight: 600;">${statusText}</div>
         <button class="btn btn-secondary" style="width: 150px;" onclick="logout()">로그아웃</button>
       </div>
     </div>
     
     <div class="card">
       <h3>📊 평가 현황</h3>
-      <p style="margin-bottom: 20px;">총 참여자: ${data.participants.length}명 | 총 평가: ${data.evaluations.length}개</p>
+      <p style="margin-bottom: 20px;">총 참여자: ${participants.length}명 | 총 평가: ${evaluations.length}개</p>
       
       <table style="width: 100%; border-collapse: collapse;">
         <tr style="background: #f7fafc;">
@@ -258,11 +307,11 @@ function renderAdmin() {
           <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e2e8f0;">받은 평가</th>
           <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e2e8f0;">평가한 건수</th>
         </tr>
-        ${data.participants.map(p => `
+        ${participants.map(p => `
           <tr>
             <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${p.name}</td>
-            <td style="padding: 10px; text-align: center; border-bottom: 1px solid #e2e8f0;">${data.evaluations.filter(e => e.target_id === p.id).length}</td>
-            <td style="padding: 10px; text-align: center; border-bottom: 1px solid #e2e8f0;">${data.evaluations.filter(e => e.evaluator_id === p.id).length}</td>
+            <td style="padding: 10px; text-align: center; border-bottom: 1px solid #e2e8f0;">${evaluations.filter(e => e.target_id === p.id).length}</td>
+            <td style="padding: 10px; text-align: center; border-bottom: 1px solid #e2e8f0;">${evaluations.filter(e => e.evaluator_id === p.id).length}</td>
           </tr>
         `).join('')}
       </table>
@@ -272,19 +321,35 @@ function renderAdmin() {
   `
 }
 
-function loginUser() {
+async function loginUser() {
   const name = document.getElementById('name').value.trim()
   if (!name) return alert('이름을 입력하세요')
   
-  let user = data.participants.find(p => p.name === name)
-  if (!user) {
-    user = { id: Date.now().toString(), name }
-    data.participants.push(user)
-    saveData()
+  try {
+    let participants = await dbFetch('participants', { 'name': `eq.${name}` })
+    let user
+    
+    if (participants.length > 0) {
+      user = participants[0]
+    } else {
+      const result = await dbInsert('participants', { id: Date.now().toString(), name })
+      if (!result) return alert('로그인 실패')
+      user = result[0] || { id: Date.now().toString(), name }
+    }
+    
+    state.user = user
+    state.page = 'menu'
+    render()
+  } catch (e) {
+    alert('로그인 실패: ' + e.message)
   }
-  
-  state.user = user
-  state.page = 'menu'
+}
+
+function loginAdmin() {
+  const pwd = document.getElementById('pwd').value
+  if (pwd !== 'admin1234') return alert('비밀번호 틀림')
+  state.isAdmin = true
+  state.page = 'admin'
   render()
 }
 
@@ -292,16 +357,14 @@ function setScore(id, score) {
   const draftKey = `draft_${state.user.id}_${state.targetId}`
   const draft = JSON.parse(localStorage.getItem(draftKey) || '{}')
   
-  // 같은 버튼을 다시 누르면 선택 해제
   if (draft[id] === score) {
     delete draft[id]
   } else {
-    draft[id] = score  // 새 점수로 변경 (기존 것은 자동 교체)
+    draft[id] = score
   }
   
   localStorage.setItem(draftKey, JSON.stringify(draft))
   
-  // UI 업데이트 - 해당 질문의 모든 버튼 업데이트
   const allButtons = document.querySelectorAll('button')
   allButtons.forEach(btn => {
     if (btn.getAttribute('data-item-id') === id) {
@@ -328,7 +391,7 @@ function saveDraft() {
   render()
 }
 
-function submitEval() {
+async function submitEval() {
   const draftKey = `draft_${state.user.id}_${state.targetId}`
   const draft = JSON.parse(localStorage.getItem(draftKey) || '{}')
   
@@ -340,50 +403,40 @@ function submitEval() {
   
   if (Object.keys(scores).length < 12) return alert('모든 항목을 입력하세요')
   
-  data.evaluations.push({
-    id: Date.now().toString(),
+  const result = await dbInsert('evaluations', {
     evaluator_id: state.user.id,
     evaluator_name: state.user.name,
     target_id: state.targetId,
     scores,
     comments
   })
-  saveData()
-  localStorage.removeItem(draftKey)
-  alert('제출되었습니다!')
-  state.page = 'menu'
-  state.targetId = null
-  render()
+  
+  if (result) {
+    localStorage.removeItem(draftKey)
+    alert('제출되었습니다!')
+    state.page = 'menu'
+    state.targetId = null
+    render()
+  } else {
+    alert('제출 실패')
+  }
 }
 
 function logout() {
   state.user = null
+  state.isAdmin = false
   state.page = 'login'
   render()
 }
 
-function loginAdmin() {
-  const pwd = document.getElementById('pwd').value
-  if (pwd !== 'admin1234') return alert('비밀번호 틀림')
-  
-  state.isAdmin = true
-  state.page = 'admin'
-  render()
-}
-
-function deleteAllData() {
+async function deleteAllData() {
   if (!confirm('모든 데이터를 삭제하시겠습니까?')) return
   const pwd = prompt('비밀번호:')
   if (pwd !== 'admin1234') return alert('비밀번호 틀림')
-  
-  data = { participants: [], evaluations: [] }
-  saveData()
-  alert('삭제되었습니다!')
-  render()
+  alert('데이터 삭제는 관리자가 수동으로 해야 합니다.')
 }
 
-loadData()
-checkCloudStatus()
+checkConnection()
 render()
 </script>
 </body>
