@@ -48,8 +48,18 @@ function render() {
     app.innerHTML = `
       <div class="card" style="max-width: 500px; margin: 100px auto;">
         <h1 style="text-align: center; margin-bottom: 30px;">📋 다면평가 시스템</h1>
-        <input type="text" id="name" placeholder="이름 입력">
-        <button class="btn btn-primary" onclick="loginUser()">로그인</button>
+        
+        <div style="margin-bottom: 20px;">
+          <h3>👥 참여자 로그인</h3>
+          <input type="text" id="name" placeholder="이름 입력">
+          <button class="btn btn-primary" onclick="loginUser()">로그인</button>
+        </div>
+        
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 20px;">
+          <h3>⚙️ 관리자 로그인</h3>
+          <input type="password" id="pwd" placeholder="비밀번호">
+          <button class="btn btn-secondary" onclick="loginAdmin()">관리자</button>
+        </div>
       </div>
     `
   } else if (state.page === 'menu') {
@@ -58,6 +68,8 @@ function render() {
     renderEval()
   } else if (state.page === 'report') {
     renderReport()
+  } else if (state.page === 'admin') {
+    renderAdmin()
   }
 }
 
@@ -147,7 +159,7 @@ function renderEval() {
             <div class="item-desc">${item.desc}</div>
             <div class="score-buttons">
               ${[1,2,3,4,5,6,7,8,9,10].map(s => `
-                <button onclick="setScore('${item.id}', ${s})" class="${draft[item.id] === s ? 'selected' : ''}">${s}</button>
+                <button data-item-id="${item.id}" onclick="setScore('${item.id}', ${s})" class="${draft[item.id] === s ? 'selected' : ''}">${s}</button>
               `).join('')}
             </div>
             <textarea placeholder="코멘트..." onchange="saveComment('${item.id}', this.value)">${draft[`comment_${item.id}`] || ''}</textarea>
@@ -202,6 +214,39 @@ function renderReport() {
   `
 }
 
+function renderAdmin() {
+  const app = document.getElementById('app')
+  
+  app.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h1>⚙️ 관리자 대시보드</h1>
+      <button class="btn btn-secondary" style="width: 150px;" onclick="logout()">로그아웃</button>
+    </div>
+    
+    <div class="card">
+      <h3>📊 평가 현황</h3>
+      <p style="margin-bottom: 20px;">총 참여자: ${data.participants.length}명 | 총 평가: ${data.evaluations.length}개</p>
+      
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr style="background: #f7fafc;">
+          <th style="padding: 10px; text-align: left; border-bottom: 2px solid #e2e8f0;">이름</th>
+          <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e2e8f0;">받은 평가</th>
+          <th style="padding: 10px; text-align: center; border-bottom: 2px solid #e2e8f0;">평가한 건수</th>
+        </tr>
+        ${data.participants.map(p => `
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${p.name}</td>
+            <td style="padding: 10px; text-align: center; border-bottom: 1px solid #e2e8f0;">${data.evaluations.filter(e => e.target_id === p.id).length}</td>
+            <td style="padding: 10px; text-align: center; border-bottom: 1px solid #e2e8f0;">${data.evaluations.filter(e => e.evaluator_id === p.id).length}</td>
+          </tr>
+        `).join('')}
+      </table>
+      
+      <button class="btn" style="background: #e53e3e; color: white; margin-top: 20px;" onclick="deleteAllData()">🗑️ 모든 데이터 삭제</button>
+    </div>
+  `
+}
+
 function loginUser() {
   const name = document.getElementById('name').value.trim()
   if (!name) return alert('이름을 입력하세요')
@@ -221,11 +266,25 @@ function loginUser() {
 function setScore(id, score) {
   const draftKey = `draft_${state.user.id}_${state.targetId}`
   const draft = JSON.parse(localStorage.getItem(draftKey) || '{}')
-  draft[id] = score
+  
+  // 같은 버튼을 다시 누르면 선택 해제
+  if (draft[id] === score) {
+    delete draft[id]
+  } else {
+    draft[id] = score  // 새 점수로 변경 (기존 것은 자동 교체)
+  }
+  
   localStorage.setItem(draftKey, JSON.stringify(draft))
-  document.querySelectorAll('button').forEach(btn => {
-    if (btn.textContent.trim() === String(score) && btn.parentElement.classList.contains('score-buttons')) {
-      btn.classList.toggle('selected')
+  
+  // UI 업데이트 - 해당 질문의 모든 버튼 업데이트
+  const allButtons = document.querySelectorAll('button')
+  allButtons.forEach(btn => {
+    if (btn.getAttribute('data-item-id') === id) {
+      if (btn.textContent.trim() === String(score) && draft[id] === score) {
+        btn.classList.add('selected')
+      } else {
+        btn.classList.remove('selected')
+      }
     }
   })
 }
@@ -275,6 +334,26 @@ function submitEval() {
 function logout() {
   state.user = null
   state.page = 'login'
+  render()
+}
+
+function loginAdmin() {
+  const pwd = document.getElementById('pwd').value
+  if (pwd !== 'admin1234') return alert('비밀번호 틀림')
+  
+  state.isAdmin = true
+  state.page = 'admin'
+  render()
+}
+
+function deleteAllData() {
+  if (!confirm('모든 데이터를 삭제하시겠습니까?')) return
+  const pwd = prompt('비밀번호:')
+  if (pwd !== 'admin1234') return alert('비밀번호 틀림')
+  
+  data = { participants: [], evaluations: [] }
+  saveData()
+  alert('삭제되었습니다!')
   render()
 }
 
